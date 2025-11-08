@@ -562,7 +562,7 @@ const InvoiceGenerator = () => {
 };
 
 // ✅ Real API Implementation (connects to your Express backend)
-const API_BASE_URL = "http://localhost:3500/api/invoices";
+const API_BASE_URL = "https://invoice-backend-lhno.onrender.com";
 
 const invoiceAPI = {
   generateInvoice: async (invoiceData, token) => {
@@ -630,7 +630,7 @@ const invoiceAPI = {
 // In your React component - update the API calls
 const twilioWhatsAppAPI = {
   sendInvoice: async ({ to, mediaUrl, invoiceNumber, amount, dueDate }, token) => {
-    const res = await fetch(`https://nonparticipating-melia-laconical.ngrok-free.dev/api/twilio/send-whatsapp-media`, {
+    const res = await fetch(`https://invoice-backend-lhno.onrender.com/api/twilio/send-whatsapp-media`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
