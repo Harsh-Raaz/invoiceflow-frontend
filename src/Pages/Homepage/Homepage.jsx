@@ -4,7 +4,7 @@ import './Homepage.css';
 import { Link } from 'react-router-dom';
 import homepageimg from "../../assets/homepageimg.jpg"
 
-const Homepage1 = ({ navigateTo }) => {
+const Homepage1 = () => { // Remove navigateTo from props
   const [logoHovered1, setLogoHovered1] = useState(false);
 
   return (
@@ -20,7 +20,6 @@ const Homepage1 = ({ navigateTo }) => {
             <span>InvoiceFlow</span>
           </div>
           <div className="nav-menu1">
-            
             <Link to="/pricing" className="nav-link1">
               <i className="fas fa-tags"></i>
               Pricing
@@ -38,10 +37,8 @@ const Homepage1 = ({ navigateTo }) => {
               About
             </Link>
             <Link to="/history" className='nav-link1'>
-            
               <i className="fas fa-history"></i>
               History
-            
             </Link>
             <Link to="/" className="nav-link1 logout1">
               <i className="fas fa-sign-out-alt"></i>
@@ -55,17 +52,16 @@ const Homepage1 = ({ navigateTo }) => {
         <section className="hero1">
           <div className="hero-content1">
             <h1 className="hero-heading animate-text">
-  Create Professional Invoices in Min
-</h1>
-
+              Create Professional Invoices in Minutes
+            </h1>
             <p>Streamline your billing process with our easy-to-use invoice generator. Fast, professional, and completely free.</p>
-            <button 
-              onClick={() => navigateTo('InvoiceGenerator')}
-              className="cta-button1"
-            >
-              <Link to="/invoice" className="cta-link1">Create your First Invoice</Link>
+            
+            {/* Fix the button - Use Link directly */}
+            <Link to="/invoice" className="cta-button1 cta-link1">
+              Create your First Invoice
               <i className="fas fa-arrow-right"></i>
-            </button>
+            </Link>
+            
             <div className="hero-stats1">
               <div className="stat1">
                 <span className="stat-number1">10K+</span>
@@ -100,6 +96,7 @@ const Homepage1 = ({ navigateTo }) => {
           </div>
         </section>
 
+        {/* Rest of your component remains the same */}
         <section className="features1">
           <h2>Why Choose <span className="gradient-text1">InvoiceFlow</span>?</h2>
           <div className="features-grid1">

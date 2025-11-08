@@ -22,8 +22,8 @@ const InvoiceGenerator = () => {
   const [items, setItems] = useState([
     { id: 1, description: "", quantity: 1, unitPrice: 0, tax: 0, discount: 0 },
   ]);
-
-  // 🔹 State for invoice generation
+  
+  const [error, setError] = useState("");
   const [invoicePdf, setInvoicePdf] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -43,7 +43,12 @@ const InvoiceGenerator = () => {
   const handleItemChange = (id, e) => {
     const updatedItems = items.map(item => {
       if (item.id === id) {
-        return { ...item, [e.target.name]: e.target.value };
+        // Convert number fields to actual numbers
+        const value = ['quantity', 'unitPrice', 'tax', 'discount'].includes(e.target.name) 
+          ? parseFloat(e.target.value) || 0 
+          : e.target.value;
+        
+        return { ...item, [e.target.name]: value };
       }
       return item;
     });
@@ -70,41 +75,80 @@ const InvoiceGenerator = () => {
 
   // 🔹 Function to generate invoice PDF
   const generateInvoice = async () => {
-    if (!customer.name || !customer.phone) {
-      alert("Please enter customer name and phone number");
-      return;
-    }
-
-    setIsGenerating(true);
-    
     try {
-      // Prepare invoice data for the API
+      // Validate ALL required fields
+      if (!customer.name || !customer.phone) {
+        alert("Please fill in customer name and phone number");
+        return;
+      }
+
+      if (!metadata.dueDate) {
+        alert("Please select a due date");
+        return;
+      }
+
+      if (!metadata.paymentTerms) {
+        alert("Please enter payment terms");
+        return;
+      }
+
+      // Validate items
+      const validItems = items.filter(item => 
+        item.description && item.quantity > 0 && item.unitPrice > 0
+      );
+      
+      if (validItems.length === 0) {
+        alert("Please add at least one valid item with description, quantity, and price");
+        return;
+      }
+
+      setIsGenerating(true);
+      setError("");
+      
+      const token = localStorage.getItem('authToken');
+      
+      if (!token) {
+        alert("Please log in to generate invoices");
+        window.location.href = '/login';
+        return;
+      }
+
+      // Prepare invoice data with ALL required fields
       const invoiceData = {
-        customer,
-        metadata,
-        items,
+        customer: {
+          name: customer.name,
+          phone: customer.phone,
+          email: customer.email || "",
+          address: customer.address || ""
+        },
+        metadata: {
+          invoiceNo: metadata.invoiceNo,
+          issueDate: metadata.issueDate,
+          dueDate: metadata.dueDate,
+          paymentTerms: metadata.paymentTerms
+        },
+        items: validItems,
         totals: calculateTotals()
       };
 
-      // Call the invoice API to generate PDF
-      const response = await invoiceAPI.generateInvoice(invoiceData);
+      console.log("Sending invoice data:", invoiceData);
+      const result = await invoiceAPI.generateInvoice(invoiceData, token);
       
-      if (response.success) {
-        setInvoicePdf(response.pdfUrl);
-        setActiveTab("preview");
-        alert("Invoice generated successfully!");
-      } else {
-        alert("Failed to generate invoice. Please try again.");
-      }
+      console.log("🔍 PDF result:", result);
+      console.log("🔍 PDF URL:", result.pdfUrl);
+      
+      setInvoicePdf(result.pdfUrl);
+      setActiveTab("preview");
+      
     } catch (error) {
-      console.error("Error generating invoice:", error);
-      alert("An error occurred while generating the invoice.");
+      console.error('Error generating invoice:', error);
+      alert(error.message || 'Failed to generate invoice');
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // 🔹 Function to send invoice via WhatsApp
+  // 🔹 Function to send invoice via WhatsApp (Twilio)
   const sendViaWhatsApp = async () => {
     if (!customer.phone) {
       alert("Please enter a phone number to send via WhatsApp");
@@ -119,21 +163,32 @@ const InvoiceGenerator = () => {
     setIsSending(true);
     
     try {
-      // Call the WhatsApp API to send the PDF
-      const response = await whatsappAPI.sendInvoice({
-        pdfUrl: invoicePdf,
-        phoneNumber: customer.phone,
-        invoiceNumber: metadata.invoiceNo
-      });
-      
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        alert("Please log in to send invoices");
+        window.location.href = '/login';
+        return;
+      }
+
+      const response = await twilioWhatsAppAPI.sendInvoice(
+        {
+          to: customer.phone,
+          mediaUrl: invoicePdf,
+          invoiceNumber: metadata.invoiceNo,
+          amount: `₹${calculateTotals().grandTotal.toFixed(2)}`,
+          dueDate: metadata.dueDate
+        },
+        token
+      );
+
       if (response.success) {
         alert("Invoice sent successfully via WhatsApp!");
       } else {
         alert("Failed to send invoice. Please try again.");
       }
     } catch (error) {
-      console.error("Error sending invoice:", error);
-      alert("An error occurred while sending the invoice.");
+      console.error("Error sending WhatsApp message:", error);
+      alert("An error occurred while sending the invoice via WhatsApp.");
     } finally {
       setIsSending(false);
     }
@@ -236,15 +291,16 @@ const InvoiceGenerator = () => {
                   />
                 </div>
                 <div className="input-group">
-                  <label>Phone (WhatsApp-enabled) *</label>
+                  <label>WhatsApp Number *</label>
                   <input
                     type="tel"
                     name="phone"
-                    placeholder="Enter phone number"
+                    placeholder="Enter WhatsApp number with country code"
                     value={customer.phone}
                     onChange={handleCustomerChange}
                     required
                   />
+                  <small className="input-hint">Include country code (e.g., +91 for India)</small>
                 </div>
                 <div className="input-group">
                   <label>Email (optional)</label>
@@ -433,6 +489,11 @@ const InvoiceGenerator = () => {
                     </>
                   )}
                 </button>
+                {error && (
+                  <div className="error-message">
+                    <i className="fas fa-exclamation-triangle"></i> {error}
+                  </div>
+                )}
               </div>
             </section>
           </>
@@ -455,6 +516,10 @@ const InvoiceGenerator = () => {
                 <div className="preview-row">
                   <span>Customer:</span>
                   <span>{customer.name}</span>
+                </div>
+                <div className="preview-row">
+                  <span>WhatsApp:</span>
+                  <span>{customer.phone}</span>
                 </div>
                 <div className="preview-row">
                   <span>Grand Total:</span>
@@ -496,39 +561,95 @@ const InvoiceGenerator = () => {
   );
 };
 
-// Fictional Invoice API implementation
+// ✅ Real API Implementation (connects to your Express backend)
+const API_BASE_URL = "http://localhost:3500/api/invoices";
+
 const invoiceAPI = {
-  generateInvoice: async (invoiceData) => {
-    // In a real implementation, this would connect to your backend
-    console.log("Generating invoice with data:", invoiceData);
+  generateInvoice: async (invoiceData, token) => {
+    console.log("Making API request to:", `${API_BASE_URL}`);
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    const res = await fetch(`${API_BASE_URL}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(invoiceData),
+    });
     
-    // Simulate successful response with a PDF URL
-    return {
-      success: true,
-      pdfUrl: `https://example.com/invoices/${invoiceData.metadata.invoiceNo}.pdf`,
-      message: "Invoice generated successfully"
-    };
-  }
+    console.log("API Response status:", res.status);
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error("API Error response:", errorText);
+      throw new Error(`Failed to create invoice: ${res.status} ${res.statusText}`);
+    }
+    
+    const response = await res.json();
+    console.log("Invoice creation response:", response);
+
+    const invoiceId = response._id || response.data?._id || response.invoice?._id || response.data?.invoice?._id;
+    console.log("Extracted invoice ID:", invoiceId);
+
+    if (!invoiceId) {
+      console.error("No invoice ID found in response:", response);
+      throw new Error("No invoice ID received from server - cannot generate PDF");
+    }
+
+    // Generate PDF for that invoice
+    console.log("Generating PDF for invoice:", invoiceId);
+    const pdfRes = await fetch(`${API_BASE_URL}/${invoiceId}/pdf`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!pdfRes.ok) {
+      const errorText = await pdfRes.text();
+      console.error("PDF Generation Error:", errorText);
+      throw new Error("Failed to generate PDF");
+    }
+    
+    const pdfData = await pdfRes.json();
+    console.log("🔍 PDF Data:", pdfData);
+    console.log("PDF generated:", pdfData);
+
+    const pdfUrl = pdfData.pdfUrl || pdfData.url || pdfData.data?.pdfUrl || pdfData.data?.url || pdfData.fileUrl;
+    console.log("🔍 Extracted PDF URL:", pdfUrl);
+
+    if (!pdfUrl) {
+      console.error("No PDF URL found in response:", pdfData);
+      throw new Error("PDF generated but no download URL received");
+    }
+
+    return { success: true, pdfUrl: pdfUrl };
+  },
 };
 
-// Fictional WhatsApp API implementation
-const whatsappAPI = {
-  sendInvoice: async (invoiceData) => {
-    // In a real implementation, this would connect to your WhatsApp API
-    console.log("Sending invoice via WhatsApp:", invoiceData);
+// In your React component - update the API calls
+const twilioWhatsAppAPI = {
+  sendInvoice: async ({ to, mediaUrl, invoiceNumber, amount, dueDate }, token) => {
+    const res = await fetch(`https://nonparticipating-melia-laconical.ngrok-free.dev/api/twilio/send-whatsapp-media`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ 
+        to: to,
+        mediaUrl: mediaUrl,
+        body: `Invoice ${invoiceNumber} for ${amount} is ready. Due: ${dueDate}.`
+      }),
+    });
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`Failed to send WhatsApp message: ${errorText}`);
+    }
     
-    // Simulate successful response
-    return {
-      success: true,
-      message: "Invoice sent via WhatsApp"
-    };
-  }
+    return await res.json();
+  },
 };
 
 export default InvoiceGenerator;

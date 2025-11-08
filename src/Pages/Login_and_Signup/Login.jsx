@@ -17,10 +17,52 @@ const Login = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Login submitted:', formData);
-    // Login logic would go here
+    try {
+      const res = await fetch("http://localhost:3500/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        })
+      });
+      
+      const data = await res.json();
+      console.log("🔍 Login Response:", data);
+
+      if (res.ok) {
+        // ✅ CRITICAL: Store the token in localStorage - FIXED PATH
+        if (data.data?.accessToken) {
+          localStorage.setItem('authToken', data.data.accessToken);
+          console.log('✅ Login accessToken stored in localStorage:', data.data.accessToken);
+        } else if (data.data?.token) {
+          localStorage.setItem('authToken', data.data.token);
+          console.log('✅ Login token stored in localStorage:', data.data.token);
+        } else if (data.accessToken) {
+          localStorage.setItem('authToken', data.accessToken);
+          console.log('✅ Login accessToken stored in localStorage:', data.accessToken);
+        } else {
+          console.log('❌ No token found in login response data:', data);
+          alert('Login successful but no token received. Please contact support.');
+          return;
+        }
+        
+        // ✅ Also store user data if available
+        if (data.data?.user) {
+          localStorage.setItem('user', JSON.stringify(data.data.user));
+        }
+        
+        alert("Login successful!");
+        window.location.href = "/home";
+      } else {
+        alert(data.message || "Login failed");
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+      alert("Something went wrong");
+    }
   };
 
   return (
@@ -40,7 +82,6 @@ const Login = () => {
             <div className="form-group">
               <label htmlFor="email">Email Address <i className="fas fa-envelope"></i></label>
               <div className="input-with-icon">
-                
                 <input
                   type="email"
                   id="email"
@@ -59,7 +100,6 @@ const Login = () => {
                 <Link to="/forgot-password" className="forgot-link">Forgot password?</Link>
               </div>
               <div className="input-with-icon">
-                
                 <input
                   type="password"
                   id="password"
