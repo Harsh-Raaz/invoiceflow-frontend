@@ -159,7 +159,7 @@ const InvoiceGenerator = () => {
       alert("Please generate the invoice first");
       return;
     }
-
+      console.log("invoicePdf value before sending WhatsApp:", invoicePdf);
     setIsSending(true);
     
     try {
@@ -566,9 +566,10 @@ const API_BASE_URL = "https://invoice-backend-lhno.onrender.com";
 
 const invoiceAPI = {
   generateInvoice: async (invoiceData, token) => {
-    console.log("Making API request to:", `${API_BASE_URL}`);
-    
-    const res = await fetch(`${API_BASE_URL}`, {
+    console.log("Making API request to:", `${API_BASE_URL}/api/invoices`);
+
+    // ✅ Create invoice
+    const res = await fetch(`${API_BASE_URL}/api/invoices`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -576,15 +577,15 @@ const invoiceAPI = {
       },
       body: JSON.stringify(invoiceData),
     });
-    
+
     console.log("API Response status:", res.status);
-    
+
     if (!res.ok) {
       const errorText = await res.text();
       console.error("API Error response:", errorText);
       throw new Error(`Failed to create invoice: ${res.status} ${res.statusText}`);
     }
-    
+
     const response = await res.json();
     console.log("Invoice creation response:", response);
 
@@ -596,9 +597,9 @@ const invoiceAPI = {
       throw new Error("No invoice ID received from server - cannot generate PDF");
     }
 
-    // Generate PDF for that invoice
+    // ✅ Generate PDF for that invoice
     console.log("Generating PDF for invoice:", invoiceId);
-    const pdfRes = await fetch(`${API_BASE_URL}/${invoiceId}/pdf`, {
+    const pdfRes = await fetch(`${API_BASE_URL}/api/invoices/${invoiceId}/pdf`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -610,10 +611,9 @@ const invoiceAPI = {
       console.error("PDF Generation Error:", errorText);
       throw new Error("Failed to generate PDF");
     }
-    
+
     const pdfData = await pdfRes.json();
     console.log("🔍 PDF Data:", pdfData);
-    console.log("PDF generated:", pdfData);
 
     const pdfUrl = pdfData.pdfUrl || pdfData.url || pdfData.data?.pdfUrl || pdfData.data?.url || pdfData.fileUrl;
     console.log("🔍 Extracted PDF URL:", pdfUrl);
@@ -623,9 +623,10 @@ const invoiceAPI = {
       throw new Error("PDF generated but no download URL received");
     }
 
-    return { success: true, pdfUrl: pdfUrl };
+    return { success: true, pdfUrl };
   },
 };
+
 
 // In your React component - update the API calls
 const twilioWhatsAppAPI = {

@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // ✅ Added useNavigate
 import './Login.css';
 
 const Login = () => {
+  const navigate = useNavigate(); // ✅ Initialize navigate
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     rememberMe: false
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -28,34 +30,28 @@ const Login = () => {
           password: formData.password,
         })
       });
-      
+
       const data = await res.json();
       console.log("🔍 Login Response:", data);
 
       if (res.ok) {
-        // ✅ CRITICAL: Store the token in localStorage - FIXED PATH
         if (data.data?.accessToken) {
           localStorage.setItem('authToken', data.data.accessToken);
-          console.log('✅ Login accessToken stored in localStorage:', data.data.accessToken);
         } else if (data.data?.token) {
           localStorage.setItem('authToken', data.data.token);
-          console.log('✅ Login token stored in localStorage:', data.data.token);
         } else if (data.accessToken) {
           localStorage.setItem('authToken', data.accessToken);
-          console.log('✅ Login accessToken stored in localStorage:', data.accessToken);
         } else {
-          console.log('❌ No token found in login response data:', data);
           alert('Login successful but no token received. Please contact support.');
           return;
         }
-        
-        // ✅ Also store user data if available
+
         if (data.data?.user) {
           localStorage.setItem('user', JSON.stringify(data.data.user));
         }
-        
+
         alert("Login successful!");
-        window.location.href = "/home";
+        navigate('/home'); // ✅ Use navigate instead of window.location.href
       } else {
         alert(data.message || "Login failed");
       }
@@ -99,16 +95,36 @@ const Login = () => {
                 <label htmlFor="password">Password <i className="fas fa-lock"></i></label>
                 <Link to="/forgot-password" className="forgot-link">Forgot password?</Link>
               </div>
-              <div className="input-with-icon">
+
+              <div className="input-with-icon" style={{ position: 'relative' }}>
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   id="password"
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="Enter your password"
                   required
+                  style={{ paddingRight: '40px' }}
                 />
+
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(prev => !prev)}
+                  className="password-toggle-btn"
+                  style={{
+                    position: 'absolute',
+                    right: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  <i className={showPassword ? "fas fa-eye-slash" : "fas fa-eye"}></i>
+                </button>
               </div>
             </div>
 
